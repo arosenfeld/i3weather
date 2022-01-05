@@ -32,20 +32,20 @@ def read_line():
         sys.exit()
 
 
-def get_weather(info, owm, location, str_format, unit):
-    obs = owm.weather_at_place(location)
-    weather = obs.get_weather()
-    wind = weather.get_wind()
-    loc = obs.get_location()
+def get_weather(info, weather_manager, location, str_format, unit):
+    obs = weather_manager.weather_at_place(location)
+    weather = obs.weather
+    wind = weather.wind()
+    loc = obs.location
     values = {
-        'temp': weather.get_temperature(unit)['temp'],
+        'temp': weather.temperature(unit)['temp'],
         'temp_unit': unit,
-        'pressure': weather.get_pressure()['press'],
-        'status': string.capwords(weather.get_detailed_status()),
-        'short_status': string.capwords(weather.get_status()),
+        'pressure': weather.pressure['press'],
+        'status': string.capwords(weather.detailed_status),
+        'short_status': string.capwords(weather.status),
         'wind_dir': wind['deg'],
         'wind_speed': wind['speed'],
-        'location': loc.get_name(),
+        'location': loc.name,
     }
 
     return {
@@ -55,7 +55,7 @@ def get_weather(info, owm, location, str_format, unit):
     return info
 
 
-def loop_weather(owm, location, str_format, unit, position):
+def loop_weather(weather_manager, location, str_format, unit, position):
     # Version line
     print_line(read_line())
     # Line starting infinite json array
@@ -67,7 +67,7 @@ def loop_weather(owm, location, str_format, unit, position):
             line, prefix = line[1:], ','
 
         j = json.loads(line)
-        weather = get_weather(j, owm, location, str_format, unit)
+        weather = get_weather(j, weather_manager, location, str_format, unit)
         j.insert(position, weather)
         print_line(prefix + json.dumps(j))
 
@@ -90,7 +90,7 @@ def main():
 
     try:
         with open(os.path.expanduser(args.config)) as fh:
-            config = configparser.SafeConfigParser()
+            config = configparser.ConfigParser()
             config.read_file(fh)
     except FileNotFoundError:
         error('Could not find configuration file at %s', args.config)
@@ -101,10 +101,7 @@ def main():
         error('API key is not set in config')
 
     owm = pyowm.OWM(api_key)
-    try:
-        owm.is_API_online()
-    except pyowm.exceptions.api_call_error.APICallError:
-        error('Invalid API key in config')
+    weather_manager = owm.weather_manager()
 
     try:
         location = config.get('owm', 'location')
@@ -117,4 +114,8 @@ def main():
         error('Invalid temperature unit %s', temp_unit)
 
     position = int(get_value(config, 'i3weather', 'position', 0))
-    loop_weather(owm, location, str_format, temp_unit, position)
+    loop_weather(weather_manager, location, str_format, temp_unit, position)
+
+
+if __name__ == "__main__":
+    main()
